@@ -9,21 +9,21 @@ import json
 
 JSON_PATH = 'data.json'
 
-def get_contionuous_chord_list(chord_list_with_timestamp): # 한글 파일명은 librosa에서 로딩이 안되기 때문에 filename_id로 wav파일을 저장
+def get_double_chord_list(chord_list_with_timestamp): # 한글 파일명은 librosa에서 로딩이 안되기 때문에 filename_id로 wav파일을 저장
     # 확장자 변경
     chord_list = []
     for i in chord_list_with_timestamp:
         chord_list.append(i['label'])
-    continuous_chord_list = []
+    double_chord_list = []
 
     for idx in range(len(chord_list) - 1):
         if chord_list[idx] != 'N' and chord_list[idx+1] != 'N':
 
-            contionuous_chord = chord_list[idx] + '-' + chord_list[idx+1]
-            continuous_chord_list.append(contionuous_chord)
+            double_chord = chord_list[idx] + '-' + chord_list[idx+1]
+            double_chord_list.append(double_chord)
 
 
-    return continuous_chord_list
+    return double_chord_list
 
 def playlist_to_audio_data(playlist_url, json_path):
 
@@ -51,13 +51,13 @@ def playlist_to_audio_data(playlist_url, json_path):
         chord_list_with_timestamp = vamp.collect(signal, sr, "nnls-chroma:chordino")
 
 
-        continous_chord_list = get_contionuous_chord_list(chord_list_with_timestamp['list'])
+        double_chord_list = get_double_chord_list(chord_list_with_timestamp['list'])
 
         dict_key_music_name = ''
         for idx in range(len(filename[0].split('-')) - 1):
             dict_key_music_name += filename[0].split('-')[idx]
 
-        chord_list_dict[dict_key_music_name] = continous_chord_list
+        chord_list_dict[dict_key_music_name] = double_chord_list
 
     with open(json_path, "w", encoding='utf-8') as fp:
         json.dump(chord_list_dict, fp, indent=4, ensure_ascii=False)
@@ -85,12 +85,6 @@ if __name__ == "__main__":
 
     json_path = JSON_PATH
     multiple_playlist_to_audio_data(playlist_url_list, json_path)
-    # 그 파일저장할때 이름을 id로만 하면 되겠네!!!
-
-
-
-
-    # chord_classification_service에서 그냥 바로 mp4로 분석한것을 참고하여 오류없이 한번 가보자!
 
 
 

@@ -1,6 +1,6 @@
 
 
-
+import operator
 import librosa
 # pip install librosa
 
@@ -16,7 +16,7 @@ import youtube_dl
 import json
 
 from PIL import Image, ImageDraw, ImageFont
-import music_chord_database as mcd
+import make_chord_database as mcd
 #pip install pillow
 
 
@@ -126,8 +126,8 @@ class _Chord_Classification_Service:
         sheet_width = int(250 * total_chord_cnt/sheet_height)
         #./ batang.ttc
         print(sheet_height * 90 / sheet_width)
-        if  sheet_height * 90 / sheet_width > 8:
-            sheet_width += 250
+        if sheet_height * 90 / sheet_width > 6:
+            sheet_width += int(sheet_height * 90 / sheet_width) * 20
         font = ImageFont.truetype('C:/Windows/Fonts/batang.ttc', 45)
         img = Image.new(mode='RGB', size=(sheet_width, sheet_height * 90), color='#FFF')
         draw = ImageDraw.Draw(img)
@@ -138,35 +138,104 @@ class _Chord_Classification_Service:
 
     def get_top_three_similar_chord_music(self, url, json_path):
 
+
         #1. 연속코드 비교
-        chord_list_with_timestramp = self.load_audio_data_from_url(url)[0] #여기서 하나만 받았기 때문에 사실 튜플형태로 반환되므로 [0]을 해준다
 
-        continuous_chord_list = mcd.get_contionuous_chord_list(chord_list_with_timestramp)
+        # 아래와 같이 코드비교할 경우,,, 중복해서 카운트를 하게된다. 처음부터 디시 해야됨... !
+        # 1. 중복없는, 코드 종류 리스트 저장 ***  이거로 기존의 chord_list를 대체하면 된다
+        # 2. 저장된 데이터에서 비교!
+        chord_list_with_timestamp, beat_list, audio_file_name = self.load_audio_data_from_url(url) #여기서 하나만 받았기 때문에 사실 튜플형태로 반환되므로 [0]을 해준다
+        print(chord_list_with_timestamp)
+
+        double_chord_list = mcd.get_double_chord_list(chord_list_with_timestamp)
+        double_chord_name_list = list(set(double_chord_list))
+        print(double_chord_name_list)
+
+        single_chord_list = []
+        for chord in chord_list_with_timestamp:
+            single_chord_list.append(chord['label'])
+        single_chord_name_list = list(set(single_chord_list))
+        print(single_chord_name_list)
 
 
-        same_chord_progression_cnt_dict = {}
+
+        same_double_chord_cnt_dict = {}
+        same_double_chord_total_cnt_dict = {}
 
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
+
         for key, value in data.items():
+            if key == audio_file_name:
+                continue #자기자신과는 비교 ㄴㄴ
+            total_cnt = 0
             same_chord_progression_cnt = {}
             for cont_chord_data in value:
-                for cont_chord in continuous_chord_list:
+                for cont_chord in double_chord_name_list:
                     if cont_chord_data == cont_chord:
                         if cont_chord not in same_chord_progression_cnt:
                             same_chord_progression_cnt[cont_chord] = 1
                         else:
                             same_chord_progression_cnt[cont_chord] += 1
-            same_chord_progression_cnt_dict[key] = same_chord_progression_cnt
+                        total_cnt += 1
+            same_double_chord_total_cnt_dict[key] = total_cnt
+            same_double_chord_cnt_dict[key] = same_chord_progression_cnt
 
-        print(same_chord_progression_cnt_dict)
+        sorted_dict = sorted(same_double_chord_total_cnt_dict.items(), key=operator.itemgetter(1), reverse=True)
+        print(sorted_dict)
+        top_three_dict = sorted_dict[:3]
+
+
+        for music in top_three_dict:
+            print(f'total count of same double chord of {music[0]} is {music[1]}')
+            print(same_double_chord_cnt_dict[music[0]])
+
+
 
 
 
 
 
         #2. 단일코드 비교
+
+        same_single_chord_cnt_dict = {}
+        same_single_chord_total_cnt_dict = {}
+
+        for key, value in data.items():
+            if key == audio_file_name:
+                continue #자기자신과는 비교 ㄴㄴ
+            total_cnt = 0
+            same_chord_progression_cnt = {}
+            for cont_chord_data in value:
+                for single_chord in single_chord_name_list:
+                    single_chord_data = cont_chord_data.split('-')[0]
+                    if single_chord_data == single_chord:
+                        if single_chord not in same_chord_progression_cnt:
+                            same_chord_progression_cnt[single_chord] = 1
+                        else:
+                            same_chord_progression_cnt[single_chord] += 1
+                        total_cnt += 1
+
+            #data.json의 마지막 더블 코드의 두번째 코드가 반영이 안되는 것을 보완!
+            for single_chord in single_chord_name_list:
+                if value[-1].split('-')[-1] == single_chord:
+                    if single_chord not in same_chord_progression_cnt:
+                        same_chord_progression_cnt[single_chord] = 1
+                    else:
+                        same_chord_progression_cnt[single_chord] += 1
+                    total_cnt += 1
+
+            same_single_chord_total_cnt_dict[key] = total_cnt
+            same_single_chord_cnt_dict[key] = same_chord_progression_cnt
+        sorted_dict = sorted(same_single_chord_total_cnt_dict.items(), key=operator.itemgetter(1), reverse=True)
+        print(sorted_dict)
+        top_three_dict = sorted_dict[:3]
+
+
+        for music in top_three_dict:
+            print(f'total count of same single chord of {music[0]} is {music[1]}')
+            print(same_single_chord_cnt_dict[music[0]])
 
 
 
@@ -199,11 +268,10 @@ The_visitor_url = 'https://www.youtube.com/watch?v=y5YmTj8KDWM'
 brown_url = 'https://www.youtube.com/watch?v=-5duYTCCtqI'
 how_you_like_that_url = 'https://www.youtube.com/watch?v=ioNng23DkIM'
 
-title = ''
-#ccs.make_music_sheet(let_it_be_url, title)
+# title = ''
+# ccs.make_music_sheet(brown_url, title)
 
-#
-#
+
 json_path = JSON_PATH
 ccs.get_top_three_similar_chord_music(The_visitor_url, json_path)
 
